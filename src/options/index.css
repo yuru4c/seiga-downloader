@@ -1,0 +1,39 @@
+h1 {
+	text-align: center;
+}
+h1 + div {
+	margin: auto;
+	max-width: 640px;
+}
+h2 + div {
+	padding-left: 2em;
+}
+hr + p {
+	text-align: right;
+}
+
+textarea {
+	display: block;
+}
+
+.replace div {
+	display: inline-block;
+	vertical-align: top;
+}
+.replace table {
+	margin-bottom: 1em;
+}
+.replace td:before {
+	content: '・';
+}
+.replace td + td:before {
+	content: '（';
+}
+.replace td + td:after {
+	content: '）';
+}
+
+.textarea-wide textarea {
+	box-sizing: border-box;
+	width: 100%;
+}

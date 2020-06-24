@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Seiga Downloader Options</title>
+	
+	<link rel="stylesheet" type="text/css" href="index.css">
+</head>
+<body>
+	<h1>設定</h1>
+	<div>
+		<h2>一般</h2>
+		<div>
+			<p>
+				<label for="filename_setting">
+					イラストのファイル パス: ./
+					<input id="filename_setting" spellcheck="false" size="40">
+				</label>
+			</p>
+			<p>
+				<label for="mg_dirname_setting">
+					　マンガのフォルダ パス: ./
+					<input id="mg_dirname_setting" spellcheck="false" size="40">
+					/
+				</label>
+			</p>
+			<p>
+				・ブラウザで設定しているフォルダからの相対パスになります<br>
+				・フォルダの区切りはスラッシュ（/）を使用して下さい
+			</p>
+		</div>
+		
+		<h2>詳細</h2>
+		<div>
+			<p>
+				<label for="caption_dl">
+					<input type="checkbox" id="caption_dl">
+					イラストの情報をテキストファイルに保存
+				</label>
+			</p>
+			<p>
+				<label for="caption_txt">
+					テキスト:
+					<textarea id="caption_txt" spellcheck="false" cols="40" rows="6"></textarea>
+				</label>
+			</p>
+		</div>
+		
+		<hr>
+		<p>
+			<input type="button" id="reset" value="リセット">
+			<input type="button" id="save" value="設定を保存">
+		</p>
+		
+		<h2>置換に使える特殊な文字列</h2>
+		<div>
+			<p>括弧内のものに置換されます</p>
+			<div class="replace">
+				<div>
+					<table>
+						<tr>
+							<td>?member-name?</td>
+							<td>ユーザー名</td>
+						</tr><tr>
+							<td>?member-id?</td>
+							<td>ユーザーID(数値)</td>
+						</tr><tr>
+							<td>?title?</td>
+							<td>タイトル</td>
+						</tr><tr>
+							<td>?illust-id?</td>
+							<td>イラストID</td>
+						</tr>
+					</table>
+					<table>
+						<tr>
+							<td>?manga-title?</td>
+							<td>マンガタイトル</td>
+						</tr><tr>
+							<td>?manga-id?</td>
+							<td>マンガID</td>
+						</tr>
+					</table>
+				</div>
+				<div>
+					<table>
+						<tr>
+							<td>?illust-year?</td>
+							<td>投稿した年</td>
+						</tr><tr>
+							<td>?illust-month?</td>
+							<td>投稿した月</td>
+						</tr><tr>
+							<td>?illust-day?</td>
+							<td>投稿した日</td>
+						</tr><tr>
+							<td>?illust-hour?</td>
+							<td>投稿した時</td>
+						</tr><tr>
+							<td>?illust-minute?</td>
+							<td>投稿した分</td>
+						</tr><tr>
+							<td>?caption?</td>
+							<td>キャプション</td>
+						</tr><tr>
+							<td>?caption-html?</td>
+							<td>HTMLタグ付きキャプション</td>
+						</tr><tr>
+							<td>?tags?</td>
+							<td>タグ</td>
+						</tr>
+					</table>
+				</div>
+			</div>
+		</div>
+		
+		<h2>
+			コンテキスト メニュー　<input type="checkbox" id="check" disabled>
+			<input type="button" id="contextmenu" disabled>
+		</h2>
+		
+		<h2>ダウンロード履歴</h2>
+		<div>
+			<p>
+				1024 項目区切りで表示されます（1025 項目以上の入力は可能です）<br>
+				順序は保証されません　重複は削除されます
+			</p>
+			<p class="textarea-wide" id="history_container" spellcheck="false"></p>
+		</div>
+		
+		<hr>
+		<p>
+			<input type="button" id="history_load" value="取得">
+			<input type="button" id="history_save" value="保存" disabled>
+		</p>
+	</div>
+	
+	<script type="text/javascript" src="index.js"></script>
+</body>
+</html>

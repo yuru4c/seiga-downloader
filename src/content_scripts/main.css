@@ -1,0 +1,46 @@
+a.sd-downloaded {
+	outline: 2px solid #3df;
+}
+img.sd-downloaded {
+	border-color: #3df !important;
+}
+
+
+#SD {
+	text-align: center;
+}
+
+#SD a {
+	text-decoration: none;
+	color: #3cf;
+	cursor: pointer;
+}
+#SD.sd-loading a,
+#SD.sd-loaded a {
+	color: lightgray;
+}
+
+#SD.sd-ready a:hover,
+#SD.sd-failed a:hover {
+	color: #5ef;
+}
+#SD.sd-loaded a:hover {
+	color: darkgray;
+}
+
+#SD span {
+	font: bold 24px/36px cursive;
+}
+
+#SD.sd-ready span:before {
+	content: 'Download';
+}
+#SD.sd-loading span:before {
+	content: 'Downloading...';
+}
+#SD.sd-loaded span:before {
+	content: 'Downloaded';
+}
+#SD.sd-failed span:before {
+	content: 'Retry';
+}
