@@ -39,11 +39,18 @@ runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	}
 });
 
-function download(urlList, version) {
+function download(urls, version) {
 	runtime.sendMessage({
-		type: 'download-mg', id: id, urlList: urlList, version: version
+		type: 'download-mg', id: id, urlList: urls.urlList, version: version
 	}, function (response) {
-		if (!response) {
+		if (response) {
+			if (version) {
+				window.postMessage({
+					type: 'sd-load-image', originals: urls.originals
+				}, window.location.origin);
+				return;
+			}
+		} else {
 			flag = true;
 		}
 		instance.onload(response);
@@ -89,7 +96,6 @@ var SD = (function () {
 	var UNSAFE  = /\\|\/|:|\*|\?|"|<|>|\|/g;
 	
 	var SRC = 'https://seiga.nicovideo.jp/image/source/';
-	var HAS_QUERY = /\?\d+$/;
 	var NOT_D = /\D+/;
 	var USER_ID = /user_id=(\d+)/;
 	
@@ -109,7 +115,6 @@ var SD = (function () {
 	prototype._VERSION = 1;
 	prototype._data = null;
 	prototype._urls = null;
-	prototype._noFullSize = false;
 	
 	prototype._state = State.READY;
 	prototype._div = null;
@@ -123,12 +128,8 @@ var SD = (function () {
 			var img = pages[i].querySelector('img[data-image-id]');
 			if (img == null) continue;
 			
-			var original = img.getAttribute('data-original');
-			if (!this._noFullSize) {
-				this._noFullSize = HAS_QUERY.test(original);
-			}
-			originals[i] = original;
 			urls[i] = SRC + img.getAttribute('data-image-id');
+			originals[i] = img.getAttribute('data-original');
 		}
 		return {urlList: urls, originals: originals};
 	};
@@ -263,14 +264,7 @@ var SD = (function () {
 		if (this._state.confirm()) {
 			this._state = State.LOADING;
 			this.update();
-			if (this._noFullSize && (silent || window.confirm(
-				'原寸大はダウンロードできない可能性があります。\n\n' +
-				'OK: 表示画質でダウンロード\nキャンセル: 続行'
-			))) {
-				downloadOriginal(this._urls.originals);
-			} else {
-				download(this._urls.urlList, this._VERSION);
-			}
+			download(this._urls, this._VERSION);
 		}
 	};
 	
@@ -279,9 +273,9 @@ var SD = (function () {
 		var span = $.createElement('span');
 		
 		var a = $.createElement('a');
-		a.addEventListener('click', function () {
+		a.onclick = function () {
 			self.onclick();
-		}, false);
+		};
 		a.appendChild(span);
 		
 		var div = $.createElement('div');
@@ -300,13 +294,8 @@ var SD = (function () {
 	return SD;
 })();
 
-function downloadOriginal(originals) {
-	window.postMessage({
-		type: 'sd-load-image', originals: originals
-	}, window.location.origin);
-}
 function sdLoaded(urlList) {
-	download(urlList, 0);
+	download({urlList: urlList}, 0);
 }
 
 

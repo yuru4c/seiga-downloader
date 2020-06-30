@@ -1,8 +1,6 @@
-a.sd-downloaded {
+.sd-downloaded {
 	outline: 2px solid #3df;
-}
-img.sd-downloaded {
-	border-color: #3df !important;
+	outline-offset: -2px;
 }
 
 

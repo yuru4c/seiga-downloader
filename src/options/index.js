@@ -1,7 +1,7 @@
 (function (global, chrome, window, $) {
 'use strict';
 
-var localStorage = global.localStorage;
+var storage = global.localStorage;
 var runtime = chrome.runtime;
 
 var MENU = 'contextmenu';
@@ -17,14 +17,14 @@ var inputs = {
 };
 
 function size() {
-	return ~~localStorage[LENGTH];
+	return ~~storage.getItem(LENGTH);
 }
 
 function create(i) {
 	var textarea = $.createElement('textarea');
 	textarea.rows = 40;
 	if (i != null) {
-		var value = localStorage[KEY + i];
+		var value = storage.getItem(KEY + i);
 		if (value != null) {
 			textarea.value = value;
 		}
@@ -41,11 +41,11 @@ $.addEventListener('DOMContentLoaded', function () {
 			var input = inputs[id];
 			switch (input.type) {
 				case 'checkbox':
-				input.checked = +localStorage[id];
+				input.checked = +storage.getItem(id);
 				break;
 				
 				default:
-				input.value = localStorage[id];
+				input.value = storage.getItem(id);
 				break;
 			}
 		}
@@ -70,92 +70,101 @@ $.addEventListener('DOMContentLoaded', function () {
 	}
 	load();
 	
-	reset.addEventListener('click', function () {
+	reset.onclick = function () {
 		if (window.confirm('設定をリセットしますか？')) {
 			this.disabled = true;
 			runtime.sendMessage({type: 'reset'}, load);
 		}
-	}, false);
+	};
 	
-	save.addEventListener('click', function () {
+	save.onclick = function () {
 		for (var id in inputs) {
 			var input = inputs[id];
 			switch (input.type) {
 				case 'checkbox':
-				localStorage[id] = +input.checked;
+				storage.setItem(id, +input.checked);
 				break;
 				
 				default:
-				localStorage[id] = input.value;
+				storage.setItem(id, input.value);
 				break;
 			}
 		}
 		this.disabled = true;
-	}, false);
+	};
 	
 	
-	var enabled = +localStorage[MENU];
+	var enabled = +storage.getItem(MENU);
 	var check  = $.getElementById('check');
 	var button = $.getElementById('contextmenu');
 	
-	function set(enabled) {
+	function set() {
 		check.checked = enabled;
 		button.value = enabled ? '無効化' : '有効化';
 		button.disabled = false;
 	}
-	set(enabled);
+	set();
 	
-	button.addEventListener('click', function () {
+	button.onclick = function () {
 		this.disabled = true;
 		var not = !enabled;
 		runtime.sendMessage({
 			type: 'contextmenu', create: not
 		}, function () {
-			localStorage[MENU] = enabled = +not;
-			set(enabled);
+			enabled = +not;
+			storage.setItem(MENU, enabled);
+			set();
 		});
-	}, false);
+	};
 	
 	
-	var historyContainer = $.getElementById('history_container');
+	var container = $.getElementById('history_container');
 	var historyLoad = $.getElementById('history_load');
 	var historySave = $.getElementById('history_save');
 	
 	var textareas = [];
-	function loadHistory() {
+	function saved() {
 		var length = size();
 		textareas.length = length;
 		
-		historyContainer.textContent = '';
-		textareas[0] = historyContainer.appendChild(
+		container.textContent = '';
+		textareas[0] = container.appendChild(
 			length ? create(0) : create()
 		);
 		for (var i = 1; i < length; i++) {
-			textareas[i] = historyContainer.appendChild(create(i));
+			textareas[i] = container.appendChild(create(i));
 		}
 		
 		historyLoad.disabled = false;
 		historySave.disabled = false;
 	}
+	function loaded() {
+		historySave.disabled = false;
+	}
 	
-	historyLoad.addEventListener('click', function () {
+	historyLoad.onclick = function () {
 		this.disabled = true;
-		runtime.sendMessage({type: 'save'}, loadHistory);
-	}, false);
+		runtime.sendMessage({type: 'save'}, saved);
+	};
 	
-	historySave.addEventListener('click', function () {
-		var i, l = size();
-		localStorage[LENGTH] = textareas.length;
-		
-		for (i = 0; i < textareas.length; i++) {
-			localStorage[KEY + i] = textareas[i].value;
+	historySave.onclick = function () {
+		try {
+			var i;
+			for (i = size() - 1; i >= textareas.length; i--) {
+				storage.removeItem(KEY + i);
+			}
+			storage.setItem(LENGTH, textareas.length);
+			
+			for (i = 0; i < textareas.length; i++) {
+				storage.setItem(KEY + i, textareas[i].value);
+			}
+		} catch (e) {
+			window.alert(e);
+			return;
 		}
-		for (; i < l; i++) {
-			delete localStorage[KEY + i];
-		}
-		
-		runtime.sendMessage({type: 'load'});
-	}, false);
+		this.disabled = true;
+		runtime.sendMessage({type: 'load'}, loaded);
+	};
 	
 }, false);
 

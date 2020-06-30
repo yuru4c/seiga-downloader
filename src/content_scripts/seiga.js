@@ -182,9 +182,9 @@ var Old = (function () {
 		var span = $.createElement('span');
 		
 		var a = $.createElement('a');
-		a.addEventListener('click', function () {
+		a.onclick = function () {
 			self.onclick();
-		}, false);
+		};
 		a.appendChild(span);
 		
 		var div = $.createElement('div');

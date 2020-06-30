@@ -7,7 +7,7 @@ var XHR = global.XMLHttpRequest;
 var Promise = global.Promise;
 var Blob    = global.Blob;
 
-var localStorage = global.localStorage;
+var storage = global.localStorage;
 var runtime = chrome.runtime;
 
 var KEYS = {
@@ -24,23 +24,23 @@ var SRC = /data-src="(.*?)"/;
 var EOL = /\n|\r\n/g;
 
 function reset(flag) {
-	if (flag || localStorage[KEYS.FILENAME] == null) {
-		localStorage[KEYS.FILENAME] =
+	if (flag || storage.getItem(KEYS.FILENAME) == null) {
+		storage.setItem(KEYS.FILENAME,
 			'seiga/?member-id? ?member-name?/' +
-			'?illust-id? ?title?';
+			'?illust-id? ?title?');
 	}
-	if (flag || localStorage[KEYS.DIRNAME] == null) {
-		localStorage[KEYS.DIRNAME] =
+	if (flag || storage.getItem(KEYS.DIRNAME) == null) {
+		storage.setItem(KEYS.DIRNAME,
 			'seiga/?member-id? ?member-name?/' +
-			'?manga-id? ?manga-title?/?illust-id? ?title?';
+			'?manga-id? ?manga-title?/?illust-id? ?title?');
 	}
-	if (flag || localStorage[KEYS.CAPTION_DL] == null) {
-		localStorage[KEYS.CAPTION_DL] = '1';
+	if (flag || storage.getItem(KEYS.CAPTION_DL) == null) {
+		storage.setItem(KEYS.CAPTION_DL, '1');
 	}
-	if (flag || localStorage[KEYS.CAPTION_TXT] == null) {
-		localStorage[KEYS.CAPTION_TXT] =
+	if (flag || storage.getItem(KEYS.CAPTION_TXT) == null) {
+		storage.setItem(KEYS.CAPTION_TXT,
 			'?title?\n?manga-title?\n?member-name?\n?tags?' +
-			'\n\n?caption-html?';
+			'\n\n?caption-html?');
 	}
 }
 
@@ -59,10 +59,10 @@ var history = (function () {
 	var prototype = History.prototype;
 	
 	function size() {
-		return ~~localStorage[LENGTH];
+		return ~~storage.getItem(LENGTH);
 	}
 	function save(i, list) {
-		localStorage[KEY + i] = list.join(SPACE);
+		storage.setItem(KEY + i, list.join(SPACE));
 	}
 	
 	prototype.put = function (id) {
@@ -84,7 +84,7 @@ var history = (function () {
 		var dict = Object.create(null);
 		var length = size();
 		for (var i = 0; i < length; i++) {
-			var value = localStorage[KEY + i];
+			var value = storage.getItem(KEY + i);
 			if (value) {
 				var ids = value.split(SPACE);
 				for (var j = 0; j < ids.length; j++) {
@@ -101,7 +101,7 @@ var history = (function () {
 			if (id) {
 				if (list.push(id) == CHUNK) {
 					save(i++, list);
-					list = [];
+					list.length = 0;
 				}
 			}
 		}
@@ -109,11 +109,10 @@ var history = (function () {
 			save(i++, list);
 		}
 		
-		var l = size();
-		localStorage[LENGTH] = i;
-		for (; i < l; i++) {
-			delete localStorage[KEY + i];
+		for (var j = size() - 1; j >= i; j--) {
+			storage.removeItem(KEY + j);
 		}
+		storage.setItem(LENGTH, i);
 	};
 	
 	return new History();
@@ -124,7 +123,7 @@ function replace(textKey, safe, sender) {
 	return new Promise(function (resolve) {
 		chrome.tabs.sendMessage(sender.tab.id, {
 			type: 'replace',
-			text: localStorage[textKey],
+			text: storage.getItem(textKey),
 			safe: safe
 		}, resolve);
 	});
@@ -180,7 +179,7 @@ function getURL(url) {
 
 
 function downloadText(p_filename, sender) {
-	if (!+localStorage[KEYS.CAPTION_DL]) {
+	if (!+storage.getItem(KEYS.CAPTION_DL)) {
 		return Promise.resolve();
 	}
 	var p_text = replace(KEYS.CAPTION_TXT, false, sender);
@@ -233,24 +232,16 @@ function download(url, id, version, sender, sendResponse) {
 	}
 	downloadMain(p_url, sender).then(function () {
 		history.put(id);
+		done(sender, id);
 		sendResponse();
 	}, function (reason) {
+		done(sender);
 		sendResponse(reason || true);
-	})
-	.then(function () {
-		var tabId = sender.tab.id;
-		if (tabId in silentTabs) {
-			chrome.tabs.remove(tabId);
-			chrome.tabs.sendMessage(silentTabs[tabId], {
-				type: 'loaded', id: id
-			});
-			delete silentTabs[tabId];
-		}
 	});
 }
 
 
-function downloadMgMain(p_dirname, url, index) {
+function downloadMgMain(p_dirname, filename, url) {
 	var p_ext = getExt(url);
 	return Promise.all([p_dirname, p_ext]).then(function (values) {
 		var dirname = values[0], ext = values[1];
@@ -258,7 +249,7 @@ function downloadMgMain(p_dirname, url, index) {
 		return new Promise(function (resolve) {
 			chrome.downloads.download({
 				url: url,
-				filename: dirname + '/' + index + ext
+				filename: dirname + '/' + filename + ext
 			}, resolve);
 		});
 	});
@@ -267,32 +258,30 @@ function downloadMgMain(p_dirname, url, index) {
 function downloadMg(urlList, id, version, sender, sendResponse) {
 	var p_dirname = replace(KEYS.DIRNAME, true, sender);
 	
-	downloadText(p_dirname, sender).then(function () {
+	var promise = version ?
+		downloadText(p_dirname, sender) :
+		Promise.resolve();
+	promise.then(function () {
 		var downloads = [];
 		for (var i = 0; i < urlList.length; i++) {
 			var url = urlList[i];
 			if (url == null) {
 				window.alert(i + 1 + ' ページ目は欠落します。');
 			} else {
-				downloads[i] = downloadMgMain(p_dirname, url, i + 1);
+				var filename = (version ? '' : 's ') + (i + 1);
+				downloads[i] = downloadMgMain(p_dirname, filename, url);
 			}
 		}
 		return Promise.all(downloads);
 	}).then(function () {
 		history.put(id);
+		done(sender, id);
 		sendResponse();
 	}, function (reason) {
-		sendResponse(reason || true);
-	})
-	.then(function () {
-		var tabId = sender.tab.id;
-		if (tabId in silentTabs) {
-			chrome.tabs.remove(tabId);
-			chrome.tabs.sendMessage(silentTabs[tabId], {
-				type: 'loaded', id: id
-			});
-			delete silentTabs[tabId];
+		if (!version) {
+			done(sender);
 		}
+		sendResponse(reason || true);
 	});
 }
 
@@ -305,6 +294,20 @@ function test(request, sender) {
 	}
 	return history.test(request.id);
 }
+
+function done(sender, loadedId) {
+	var tabId = sender.tab.id;
+	if (tabId in silentTabs) {
+		chrome.tabs.remove(tabId);
+		if (loadedId != null) {
+			chrome.tabs.sendMessage(silentTabs[tabId], {
+				type: 'loaded', id: loadedId
+			});
+		}
+		delete silentTabs[tabId];
+	}
+}
+
 
 function contextmenu(create, callback) {
 	if (create) {
@@ -334,9 +337,9 @@ function onclick_download(linkUrl, tab) {
 }
 
 
-window.addEventListener('unload', function () {
+window.onunload = function () {
 	history.save();
-}, false);
+};
 
 chrome.contextMenus.onClicked.addListener(function (info, tab) {
 	switch (info.menuItemId) {
@@ -348,7 +351,7 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
 
 runtime.onInstalled.addListener(function () {
 	reset(false);
-	contextmenu(+localStorage['contextmenu']);
+	contextmenu(+storage.getItem('contextmenu'));
 });
 
 runtime.onMessage.addListener(function (request, sender, sendResponse) {
@@ -375,6 +378,11 @@ runtime.onMessage.addListener(function (request, sender, sendResponse) {
 		);
 		return true;
 		
+		case 'reset':
+		reset(true);
+		sendResponse();
+		break;
+		
 		case 'save':
 		history.save();
 		sendResponse();
@@ -382,11 +390,6 @@ runtime.onMessage.addListener(function (request, sender, sendResponse) {
 		
 		case 'load':
 		history.load();
-		sendResponse();
-		break;
-		
-		case 'reset':
-		reset(true);
 		sendResponse();
 		break;
 		
