@@ -263,14 +263,18 @@ function downloadMg(urlList, id, version, sender, sendResponse) {
 		Promise.resolve();
 	promise.then(function () {
 		var downloads = [];
+		var fails = [];
 		for (var i = 0; i < urlList.length; i++) {
 			var url = urlList[i];
 			if (url == null) {
-				window.alert(i + 1 + ' ページ目は欠落します。');
+				fails.push(i + 1);
 			} else {
 				var filename = (version ? '' : 's ') + (i + 1);
 				downloads[i] = downloadMgMain(p_dirname, filename, url);
 			}
+		}
+		if (fails.length) {
+			window.alert(fails.join(', ') + ' ページ目は欠落します。');
 		}
 		return Promise.all(downloads);
 	}).then(function () {

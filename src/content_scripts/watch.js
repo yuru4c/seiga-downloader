@@ -120,17 +120,22 @@ var SD = (function () {
 	prototype._div = null;
 	
 	prototype._getImageURLs = function () {
-		var pages = $.querySelectorAll('#page_contents .page');
 		var urls = [], originals = [];
-		originals.length = urls.length = pages.length;
 		
-		for (var i = 0; i < urls.length; i++) {
-			var img = pages[i].querySelector('img[data-image-id]');
-			if (img == null) continue;
-			
-			urls[i] = SRC + img.getAttribute('data-image-id');
-			originals[i] = img.getAttribute('data-original');
+		var header = $.getElementById('full_watch_head_bar');
+		var pages = $.querySelectorAll('#page_contents .page img[data-image-id]');
+		
+		if (header != null) {
+			originals.length = urls.length =
+				+header.getAttribute('data-page-count');
 		}
+		
+		for (var i = 0, l = pages.length; i < l; i++) {
+			var img = pages[i];
+			urls[i] = SRC + img.getAttribute('data-image-id');
+			originals[i]  = img.getAttribute('data-original');
+		}
+		
 		return {urlList: urls, originals: originals};
 	};
 	
