@@ -177,6 +177,22 @@ function getURL(url) {
 	});
 }
 
+function downloadAsync(url, filename) {
+	return new Promise(function (resolve, reject) {
+		chrome.downloads.download({
+			url: url,
+			filename: filename
+		}, function (downloadId) {
+			var error = runtime.lastError;
+			if (error == null) {
+				resolve(downloadId);
+			} else {
+				reject(error.message);
+			}
+		});
+	});
+}
+
 
 function downloadText(p_filename, sender) {
 	if (!+storage.getItem(KEYS.CAPTION_DL)) {
@@ -187,16 +203,10 @@ function downloadText(p_filename, sender) {
 	return Promise.all([p_filename, p_text]).then(function (values) {
 		var filename = values[0], text = values[1];
 		
-		return new Promise(function (resolve) {
-			var blob = new Blob([
-				'\uFEFF', text.replace(EOL, '\r\n')
-			]);
-			
-			chrome.downloads.download({
-				url: URL.createObjectURL(blob),
-				filename: filename + '.txt'
-			}, resolve);
-		});
+		var url = URL.createObjectURL(new Blob([
+			'\uFEFF', text.replace(EOL, '\r\n')
+		]));
+		return downloadAsync(url, filename + '.txt');
 	});
 }
 
@@ -210,12 +220,7 @@ function downloadMain(p_url, sender) {
 		var url = values[0];
 		var filename = values[1], ext = values[2];
 		
-		return new Promise(function (resolve) {
-			chrome.downloads.download({
-				url: url,
-				filename: filename + ext
-			}, resolve);
-		});
+		return downloadAsync(url, filename + ext);
 	});
 }
 
@@ -237,6 +242,8 @@ function download(url, id, version, sender, sendResponse) {
 	}, function (reason) {
 		done(sender);
 		sendResponse(reason || true);
+		
+		console.warn('download', [url, id, version], reason);
 	});
 }
 
@@ -246,12 +253,7 @@ function downloadMgMain(p_dirname, filename, url) {
 	return Promise.all([p_dirname, p_ext]).then(function (values) {
 		var dirname = values[0], ext = values[1];
 		
-		return new Promise(function (resolve) {
-			chrome.downloads.download({
-				url: url,
-				filename: dirname + '/' + filename + ext
-			}, resolve);
-		});
+		return downloadAsync(url, dirname + '/' + filename + ext);
 	});
 }
 
@@ -286,6 +288,8 @@ function downloadMg(urlList, id, version, sender, sendResponse) {
 			done(sender);
 		}
 		sendResponse(reason || true);
+		
+		console.warn('download-mg', [urlList, id, version], reason);
 	});
 }
 

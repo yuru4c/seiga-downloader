@@ -87,7 +87,7 @@ var State = (function () {
 var Old = (function () {
 	
 	var REPLACE = /\?(.+?)\?/g;
-	var UNSAFE  = /\\|\/|:|\*|\?|"|<|>|\|/g;
+	var UNSAFE  = /\\|\/|:|\*|\?|"|<|>|\||\.|~/g;
 	
 	function Old() { }
 	var prototype = Old.prototype;

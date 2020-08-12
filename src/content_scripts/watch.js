@@ -93,7 +93,7 @@ var State = (function () {
 var SD = (function () {
 	
 	var REPLACE = /\?(.+?)\?/g;
-	var UNSAFE  = /\\|\/|:|\*|\?|"|<|>|\|/g;
+	var UNSAFE  = /\\|\/|:|\*|\?|"|<|>|\||\.|~/g;
 	
 	var SRC = 'https://seiga.nicovideo.jp/image/source/';
 	var NOT_D = /\D+/;
