@@ -1,6 +1,6 @@
 {
 	"manifest_version": 2,
-	"version": "3.8.7.11",
+	"version": "3.8.8",
 	"name": "Seiga Downloader",
 	"description": "ニコニコ静画の作品ページに画像ダウンロード用のリンクを追加",
 	"icons": {
@@ -11,6 +11,8 @@
 	"permissions": [
 		"contextMenus",
 		"downloads",
+		"storage",
+		"unlimitedStorage",
 		"*://lohas.nicoseiga.jp/",
 		"*://seiga.nicovideo.jp/",
 		"https://dcdn.cdn.nimg.jp/"

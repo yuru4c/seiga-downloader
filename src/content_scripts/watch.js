@@ -1,8 +1,7 @@
-(function (global, chrome, window, $) {
+(function (global, window, $, _) {
 'use strict';
 
 var Object  = global.Object;
-var runtime = chrome.runtime;
 
 var NO = {NAME: 'null', ID: '0'};
 
@@ -16,7 +15,7 @@ var id = filename($.location);
 var instance;
 var silent, flag, complete = false;
 
-runtime.sendMessage({type: 'test', id: id}, function (response) {
+_.runtime.sendMessage({type: 'test', id: id}, function (response) {
 	silent = response == null;
 	if (silent) {
 		flag = false;
@@ -31,7 +30,7 @@ runtime.sendMessage({type: 'test', id: id}, function (response) {
 	}
 });
 
-runtime.onMessage.addListener(function (request, sender, sendResponse) {
+_.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	switch (request.type) {
 		case 'replace':
 		sendResponse(instance.replace(request.text, request.safe));
@@ -40,7 +39,7 @@ runtime.onMessage.addListener(function (request, sender, sendResponse) {
 });
 
 function download(urls, version) {
-	runtime.sendMessage({
+	_.runtime.sendMessage({
 		type: 'download-mg', id: id, urlList: urls.urlList, version: version
 	}, function (response) {
 		if (response) {
@@ -318,7 +317,7 @@ window.addEventListener('message', function (e) {
 $.addEventListener('DOMContentLoaded', function () {
 	var script = this.createElement('script');
 	script.type = 'text/javascript';
-	script.src = runtime.getURL('inject.js');
+	script.src = _.runtime.getURL('inject.js');
 	this.head.appendChild(script);
 	
 	SD.main();
@@ -336,4 +335,4 @@ window.addEventListener('load', function () {
 	}
 }, false);
 
-})(this, chrome, window, document);
+})(this, window, document, chrome);

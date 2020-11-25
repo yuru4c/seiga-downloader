@@ -118,14 +118,14 @@
 			コンテキスト メニュー　<input type="checkbox" id="check" disabled>
 			<input type="button" id="contextmenu" disabled>
 		</h2>
+		<br>
 		
 		<h2>ダウンロード履歴</h2>
 		<div>
-			<p>
-				1024 項目区切りで表示されます（1025 項目以上の入力は可能です）<br>
-				順序は保証されません　重複は削除されます
+			<p>順序は保証されません　重複は削除されます</p>
+			<p class="textarea-wide" spellcheck="false">
+				<textarea rows="40" class="hidden" id="history_text"></textarea>
 			</p>
-			<p class="textarea-wide" id="history_container" spellcheck="false"></p>
 		</div>
 		
 		<hr>

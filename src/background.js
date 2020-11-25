@@ -1,14 +1,14 @@
-(function (global, chrome, window) {
+(function (global, window, _) {
 'use strict';
 
 var Object = global.Object;
+var Promise = global.Promise;
+var Blob = global.Blob;
 var URL = global.URL;
 var XHR = global.XMLHttpRequest;
-var Promise = global.Promise;
-var Blob    = global.Blob;
 
 var storage = global.localStorage;
-var runtime = chrome.runtime;
+var local = _.storage.local;
 
 var KEYS = {
 	FILENAME: 'filename_setting',
@@ -48,71 +48,200 @@ var history = (function () {
 	
 	var KEY = 'history.';
 	var LENGTH = KEY + 'length';
+	var DIFF = 'diff';
 	
 	var SPACE = ' ';
-	var CHUNK = 1024;
-	var VALUE = true;
 	
 	function History() {
-		this.load();
+		this._dict = null;
+		var item = storage.getItem(DIFF);
+		this._diff = item ? item.split(SPACE) : [];
+		
+		this._error = null;
+		this._queue = null;
 	}
 	var prototype = History.prototype;
 	
-	function size() {
-		return ~~storage.getItem(LENGTH);
-	}
-	function save(i, list) {
-		storage.setItem(KEY + i, list.join(SPACE));
-	}
+	prototype.save = function () {
+		storage.setItem(DIFF, this._diff.join(SPACE));
+	};
 	
-	prototype.put = function (id) {
-		this._dict[id] = VALUE;
+	prototype._load = function () {
+		var self = this;
+		local.get(["history"], function (items) {
+			var error = _.runtime.lastError;
+			self._init(items, error);
+			
+			if (error != null) {
+				window.console.warn('_load', error.message);
+			}
+		});
 	};
-	prototype.test = function (id) {
-		return id in this._dict;
+	
+	prototype._save = function (dict) {
+		var d = dict != null ? dict : this._dict;
+		return new Promise(function (resolve, reject) {
+			local.set({"history": Object.keys(d)}, function () {
+				var error = _.runtime.lastError;
+				if (error != null) {
+					reject(error);
+					
+					window.console.warn('_save', error.message);
+				} else {
+					resolve();
+				}
+			});
+		});
 	};
-	prototype.list = function (idList) {
-		var list = [];
-		list.length = idList.length;
-		for (var i = 0; i < list.length; i++) {
-			list[i] = this.test(idList[i]);
+	
+	prototype._update = function (save) {
+		var diff = this._diff;
+		if (diff.length > 0) {
+			this._putAll(diff);
+			if (save == false) return;
+			
+			var newDiff = this._diff = [];
+			var promise = this._save();
+			var self = this;
+			promise.then(null, function (reason) {
+				if (self._diff == newDiff) {
+					self._diff = diff.concat(newDiff);
+				}
+			});
+			return promise;
+		} else if (save) {
+			return this._save();
 		}
-		return list;
 	};
 	
-	prototype.load = function () {
-		var dict = Object.create(null);
-		var length = size();
+	prototype._loadStorage = function () {
+		var length = ~~storage.getItem(LENGTH);
 		for (var i = 0; i < length; i++) {
 			var value = storage.getItem(KEY + i);
 			if (value) {
-				var ids = value.split(SPACE);
-				for (var j = 0; j < ids.length; j++) {
-					dict[ids[j]] = VALUE;
-				}
+				this._putAll(value.split(SPACE));
 			}
 		}
-		this._dict = dict;
+		this._update(true).then(function () {
+			storage.removeItem(LENGTH);
+			for (var i = 0; i < length; i++) {
+				storage.removeItem(KEY + i);
+			}
+		});
 	};
-	prototype.save = function () {
-		var i = 0;
-		var list = [];
-		for (var id in this._dict) {
-			if (id) {
-				if (list.push(id) == CHUNK) {
-					save(i++, list);
-					list.length = 0;
+	
+	prototype._init = function (items, error) {
+		this._dict = Object.create(null);
+		this._error = error;
+		if (error != null) {
+			this._update(false);
+		} else {
+			var history = items["history"];
+			if (history == null) {
+				this._loadStorage();
+			} else {
+				this._putAll(history);
+				this._update();
+			}
+		}
+		for (var i = 0; i < this._queue.length; i++) {
+			this._queue[i].exec(this);
+		}
+		this._queue = null;
+	};
+	
+	prototype._call = function (arg) {
+		if (this._dict == null) {
+			if (this._queue == null) {
+				this._queue = [arg];
+				this._load();
+			} else {
+				this._queue.push(arg);
+			}
+			return true;
+		}
+		arg.exec(this);
+	};
+	
+	prototype._test = function (id) {
+		return id in this._dict;
+	};
+	prototype._putAll = function (history) {
+		for (var i = 0; i < history.length; i++) {
+			this._dict[history[i]] = true;
+		}
+	};
+	
+	prototype.put = function (id) {
+		if (this._dict != null) {
+			this._dict[id] = true;
+		}
+		this._diff.push(id);
+	};
+	
+	prototype.test = function (id, sendResponse) {
+		return this._call(new Test(id, sendResponse));
+	};
+	prototype.list = function (idList, sendResponse) {
+		return this._call(new List(idList, sendResponse));
+	};
+	
+	prototype.getValue = function (sendResponse) {
+		return this._call(new GetValue(sendResponse));
+	};
+	prototype.setValue = function (value, sendResponse) {
+		var dict = Object.create(null);
+		if (value) {
+			var history = value.split(SPACE);
+			for (var i = 0; i < history.length; i++) {
+				var id = history[i];
+				if (id) {
+					dict[id] = true;
 				}
 			}
 		}
-		if (list.length) {
-			save(i++, list);
+		var self = this;
+		this._save(dict).then(function () {
+			self._dict = dict;
+			self._diff = [];
+			sendResponse();
+		}, function (reason) {
+			sendResponse(reason);
+		});
+		return true;
+	};
+	
+	function Test(id, callback) {
+		this.id = id;
+		this.callback = callback;
+	}
+	Test.prototype.exec = function (history) {
+		this.callback(history._test(this.id));
+	};
+	
+	function List(idList, callback) {
+		this.idList = idList;
+		this.callback = callback;
+	}
+	List.prototype.exec = function (history) {
+		var list = [];
+		list.length = this.idList.length;
+		for (var i = 0; i < list.length; i++) {
+			list[i] = history._test(this.idList[i]);
 		}
-		
-		for (var j = size() - 1; j >= i; j--) {
-			storage.removeItem(KEY + j);
+		this.callback(list);
+	};
+	
+	function GetValue(callback) {
+		this.callback = callback;
+	}
+	GetValue.prototype.exec = function (history) {
+		var result = {value: Object.keys(history._dict).join(SPACE)};
+		var error = history._error;
+		if (error != null) {
+			result.error = error;
 		}
-		storage.setItem(LENGTH, i);
+		this.callback(result);
 	};
 	
 	return new History();
@@ -121,7 +250,7 @@ var history = (function () {
 
 function replace(textKey, safe, sender) {
 	return new Promise(function (resolve) {
-		chrome.tabs.sendMessage(sender.tab.id, {
+		_.tabs.sendMessage(sender.tab.id, {
 			type: 'replace',
 			text: storage.getItem(textKey),
 			safe: safe
@@ -179,15 +308,15 @@ function getURL(url) {
 
 function downloadAsync(url, filename) {
 	return new Promise(function (resolve, reject) {
-		chrome.downloads.download({
+		_.downloads.download({
 			url: url,
 			filename: filename
 		}, function (downloadId) {
-			var error = runtime.lastError;
-			if (error == null) {
-				resolve(downloadId);
+			var error = _.runtime.lastError;
+			if (error != null) {
+				reject(error);
 			} else {
-				reject(error.message);
+				resolve(downloadId);
 			}
 		});
 	});
@@ -243,7 +372,7 @@ function download(url, id, version, sender, sendResponse) {
 		done(sender);
 		sendResponse(reason || true);
 		
-		console.warn('download', [url, id, version], reason);
+		window.console.warn('download', [url, id, version], reason && reason.message);
 	});
 }
 
@@ -284,42 +413,53 @@ function downloadMg(urlList, id, version, sender, sendResponse) {
 		done(sender, id);
 		sendResponse();
 	}, function (reason) {
-		if (!version) {
+		var response = reason || true;
+		if (version) {
+			sendResponse(response);
+		} else {
 			done(sender);
+			sendResponse(response);
+			
+			window.console.warn('download-mg', [urlList, id, version], reason && reason.message);
 		}
-		sendResponse(reason || true);
-		
-		console.warn('download-mg', [urlList, id, version], reason);
 	});
 }
 
 
-var silentTabs = Object.create(null);
+var createdToOpener = Object.create(null);
 
-function test(request, sender) {
-	if (sender.tab.id in silentTabs) {
-		return null;
+function test(request, sender, sendResponse) {
+	if (sender.tab.id in createdToOpener) {
+		sendResponse(null);
+	} else {
+		return history.test(request.id, sendResponse);
 	}
-	return history.test(request.id);
+}
+function list(request, sender, sendResponse) {
+	if (sender.tab.id in createdToOpener) {
+		sendResponse(null);
+	} else {
+		return history.list(request.idList, sendResponse);
+	}
 }
 
 function done(sender, loadedId) {
 	var tabId = sender.tab.id;
-	if (tabId in silentTabs) {
-		chrome.tabs.remove(tabId);
+	if (tabId in createdToOpener) {
+		_.tabs.remove(tabId);
 		if (loadedId != null) {
-			chrome.tabs.sendMessage(silentTabs[tabId], {
+			_.tabs.sendMessage(createdToOpener[tabId], {
 				type: 'loaded', id: loadedId
 			});
 		}
-		delete silentTabs[tabId];
+		delete createdToOpener[tabId];
 	}
 }
 
 
 function contextmenu(create, callback) {
 	if (create) {
-		chrome.contextMenus.create({
+		_.contextMenus.create({
 			title: 'ダウンロード',
 			id: 'download',
 			contexts: ['link'],
@@ -332,15 +472,15 @@ function contextmenu(create, callback) {
 			]
 		}, callback);
 	} else {
-		chrome.contextMenus.removeAll(callback);
+		_.contextMenus.removeAll(callback);
 	}
 }
 
 function onclick_download(linkUrl, tab) {
-	chrome.tabs.create({
+	_.tabs.create({
 		url: linkUrl, openerTabId: tab.id, active: false
 	}, function (newTab) {
-		silentTabs[newTab.id] = tab.id;
+		createdToOpener[newTab.id] = tab.id;
 	});
 }
 
@@ -349,7 +489,7 @@ window.onunload = function () {
 	history.save();
 };
 
-chrome.contextMenus.onClicked.addListener(function (info, tab) {
+_.contextMenus.onClicked.addListener(function (info, tab) {
 	switch (info.menuItemId) {
 		case 'download':
 		onclick_download(info.linkUrl, tab);
@@ -357,20 +497,18 @@ chrome.contextMenus.onClicked.addListener(function (info, tab) {
 	}
 });
 
-runtime.onInstalled.addListener(function () {
+_.runtime.onInstalled.addListener(function () {
 	reset(false);
 	contextmenu(+storage.getItem('contextmenu'));
 });
 
-runtime.onMessage.addListener(function (request, sender, sendResponse) {
+_.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	switch (request.type) {
 		case 'test':
-		sendResponse(test(request, sender));
-		break;
+		return test(request, sender, sendResponse);
 		
 		case 'list':
-		sendResponse(history.list(request.idList));
-		break;
+		return list(request, sender, sendResponse);
 		
 		case 'download':
 		download(
@@ -391,15 +529,11 @@ runtime.onMessage.addListener(function (request, sender, sendResponse) {
 		sendResponse();
 		break;
 		
-		case 'save':
-		history.save();
-		sendResponse();
-		break;
-		
 		case 'load':
-		history.load();
-		sendResponse();
-		break;
+		return history.getValue(sendResponse);
+		
+		case 'save':
+		return history.setValue(request.value, sendResponse);
 		
 		case 'contextmenu':
 		contextmenu(request.create, sendResponse);
@@ -407,4 +541,4 @@ runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	}
 });
 
-})(this, chrome, window);
+})(this, window, chrome);

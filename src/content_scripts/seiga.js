@@ -1,8 +1,7 @@
-(function (global, chrome, window, $) {
+(function (global, window, $, _) {
 'use strict';
 
 var Object  = global.Object;
-var runtime = chrome.runtime;
 
 var SEIGA = 'http://seiga.nicovideo.jp';
 var NO = {NAME: 'null', ID: '0'};
@@ -17,7 +16,7 @@ var id = filename($.location);
 var instance;
 var silent, flag, complete = false;
 
-runtime.sendMessage({type: 'test', id: id}, function (response) {
+_.runtime.sendMessage({type: 'test', id: id}, function (response) {
 	silent = response == null;
 	if (silent) {
 		flag = false;
@@ -32,7 +31,7 @@ runtime.sendMessage({type: 'test', id: id}, function (response) {
 	}
 });
 
-runtime.onMessage.addListener(function (request, sender, sendResponse) {
+_.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	switch (request.type) {
 		case 'replace':
 		sendResponse(instance.replace(request.text, request.safe));
@@ -41,7 +40,7 @@ runtime.onMessage.addListener(function (request, sender, sendResponse) {
 });
 
 function download(url, version) {
-	runtime.sendMessage({
+	_.runtime.sendMessage({
 		type: 'download', id: id, url: url, version: version
 	}, function (response) {
 		if (!response) {
@@ -313,4 +312,4 @@ window.addEventListener('load', function () {
 	}
 }, false);
 
-})(this, chrome, window, document);
+})(this, window, document, chrome);

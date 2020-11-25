@@ -1,7 +1,5 @@
-(function (chrome, $) {
+(function ($, _) {
 'use strict';
-
-var runtime = chrome.runtime;
 
 var RE = /^\/seiga\/(im\d+)|^\/watch\/(mg\d+)/;
 
@@ -49,11 +47,13 @@ for (var i = 0, l = imgs.length; i < l; i++) {
 	length++;
 }
 
-runtime.sendMessage({
+_.runtime.sendMessage({
 	type: 'list', idList: idList
 }, function (response) {
-	for (var i = 0; i < response.length; i++) {
-		itemList[i].setState(response[i]);
+	if (response != null) {
+		for (var i = 0; i < response.length; i++) {
+			itemList[i].setState(response[i]);
+		}
 	}
 });
 
@@ -65,7 +65,7 @@ function loaded(id) {
 	}
 }
 
-runtime.onMessage.addListener(function (message) {
+_.runtime.onMessage.addListener(function (message) {
 	switch (message.type) {
 		case 'loaded':
 		loaded(message.id);
@@ -73,4 +73,4 @@ runtime.onMessage.addListener(function (message) {
 	}
 });
 
-})(chrome, document);
+})(document, chrome);

@@ -1,13 +1,9 @@
-(function (global, chrome, window, $) {
+(function (global, window, $, _) {
 'use strict';
 
 var storage = global.localStorage;
-var runtime = chrome.runtime;
 
 var MENU = 'contextmenu';
-
-var KEY = 'history.';
-var LENGTH = KEY + 'length';
 
 var inputs = {
 	'filename_setting':   null,
@@ -15,22 +11,6 @@ var inputs = {
 	'caption_dl':  null,
 	'caption_txt': null
 };
-
-function size() {
-	return ~~storage.getItem(LENGTH);
-}
-
-function create(i) {
-	var textarea = $.createElement('textarea');
-	textarea.rows = 40;
-	if (i != null) {
-		var value = storage.getItem(KEY + i);
-		if (value != null) {
-			textarea.value = value;
-		}
-	}
-	return textarea;
-}
 
 $.addEventListener('DOMContentLoaded', function () {
 	var reset = $.getElementById('reset');
@@ -73,7 +53,7 @@ $.addEventListener('DOMContentLoaded', function () {
 	reset.onclick = function () {
 		if (window.confirm('設定をリセットしますか？')) {
 			this.disabled = true;
-			runtime.sendMessage({type: 'reset'}, load);
+			_.runtime.sendMessage({type: 'reset'}, load);
 		}
 	};
 	
@@ -108,7 +88,7 @@ $.addEventListener('DOMContentLoaded', function () {
 	button.onclick = function () {
 		this.disabled = true;
 		var not = !enabled;
-		runtime.sendMessage({
+		_.runtime.sendMessage({
 			type: 'contextmenu', create: not
 		}, function () {
 			enabled = +not;
@@ -118,54 +98,45 @@ $.addEventListener('DOMContentLoaded', function () {
 	};
 	
 	
-	var container = $.getElementById('history_container');
+	var historyText = $.getElementById('history_text');
 	var historyLoad = $.getElementById('history_load');
 	var historySave = $.getElementById('history_save');
 	
-	var textareas = [];
-	function saved() {
-		var length = size();
-		textareas.length = length;
-		
-		container.textContent = '';
-		textareas[0] = container.appendChild(
-			length ? create(0) : create()
-		);
-		for (var i = 1; i < length; i++) {
-			textareas[i] = container.appendChild(create(i));
-		}
-		
-		historyLoad.disabled = false;
-		historySave.disabled = false;
+	function setDisabled(disabled) {
+		historyText.disabled = disabled;
+		historyLoad.disabled = disabled;
+		historySave.disabled = disabled;
 	}
-	function loaded() {
-		historySave.disabled = false;
+	
+	function saved(response) {
+		if (response != null) {
+			window.alert('保存時にエラーが発生しました\n\n' + response.message);
+		}
+		setDisabled(false);
+	}
+	function loaded(response) {
+		var error = response.error;
+		if (error != null) {
+			window.alert('読み込み時にエラーが発生しました\n\n' + error.message);
+		}
+		historyText.value = response.value;
+		setDisabled(false);
 	}
 	
 	historyLoad.onclick = function () {
-		this.disabled = true;
-		runtime.sendMessage({type: 'save'}, saved);
+		setDisabled(true);
+		historyText.className = '';
+		_.runtime.sendMessage({type: 'load'}, loaded);
 	};
 	
 	historySave.onclick = function () {
-		try {
-			var i;
-			for (i = size() - 1; i >= textareas.length; i--) {
-				storage.removeItem(KEY + i);
-			}
-			storage.setItem(LENGTH, textareas.length);
-			
-			for (i = 0; i < textareas.length; i++) {
-				storage.setItem(KEY + i, textareas[i].value);
-			}
-		} catch (e) {
-			window.alert(e);
-			return;
-		}
-		this.disabled = true;
-		runtime.sendMessage({type: 'load'}, loaded);
+		setDisabled(true);
+		_.runtime.sendMessage({
+			type: 'save',
+			value: historyText.value
+		}, saved);
 	};
 	
 }, false);
 
-})(this, chrome, window, document);
+})(this, window, document, chrome);
