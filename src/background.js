@@ -273,6 +273,9 @@ function getExt(url) {
 					case 'image/jpeg':
 					resolve('.jpg');
 					return;
+					case 'image/null':
+					resolve('.webp');
+					return;
 				}
 				var ext = EXT.exec(mime);
 				if (ext != null) {
