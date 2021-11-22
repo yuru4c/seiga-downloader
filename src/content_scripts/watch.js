@@ -5,7 +5,7 @@ var Object  = global.Object;
 
 var NO = {NAME: 'null', ID: '0'};
 
-var DRM = /^https:\/\/drm\.cdn\.nicomanga\.jp\//;
+var DIRECT = /^https:\/\/deliver\.cdn\.nicomanga\.jp\//;
 var LAST = /[^\/]*$/;
 function filename(url) {
 	return LAST.exec(url.pathname)[0];
@@ -39,26 +39,26 @@ _.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	}
 });
 
-var _urlList;
+var tempUrlList;
 function download(urls, version) {
 	_.runtime.sendMessage({
 		type: 'download-mg', id: id, urlList: urls.urlList, version: version
 	}, function (response) {
 		if (response) {
 			if (version) {
-				var originals = [];
-				_urlList = [];
+				var urlList = [], originals = [];
 				for (var i = 0; i < urls.originals.length; i++) {
 					var u = urls.originals[i];
-					if (DRM.test(u)) {
-						originals.push(u);
+					if (DIRECT.test(u)) {
+						urlList.push(u);
 					} else {
-						_urlList.push(u);
+						originals.push(u);
 					}
 				}
 				if (originals.length == 0) {
-					download({urlList: _urlList}, 0);
+					download({urlList: urlList}, 0);
 				} else {
+					tempUrlList = urlList;
 					window.postMessage({
 						type: 'sd-load-image', originals: originals
 					}, window.location.origin);
@@ -315,8 +315,8 @@ var SD = (function () {
 })();
 
 function sdLoaded(urlList) {
-	download({urlList: _urlList.concat(urlList)}, 0);
-	_urlList = null;
+	download({urlList: tempUrlList.concat(urlList)}, 0);
+	tempUrlList = null;
 }
 
 

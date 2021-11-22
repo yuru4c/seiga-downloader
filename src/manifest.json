@@ -1,5 +1,5 @@
 {
-	"manifest_version": 2,
+	"manifest_version": 3,
 	"version": "3.8.10",
 	"name": "Seiga Downloader",
 	"description": "ニコニコ静画の作品ページに画像ダウンロード用のリンクを追加",
@@ -12,15 +12,16 @@
 		"contextMenus",
 		"downloads",
 		"storage",
-		"unlimitedStorage",
+		"unlimitedStorage"
+	],
+	"host_permissions": [
 		"*://lohas.nicoseiga.jp/",
 		"*://seiga.nicovideo.jp/",
 		"https://dcdn.cdn.nimg.jp/",
 		"https://deliver.cdn.nicomanga.jp/"
 	],
 	"background": {
-		"persistent": false,
-		"scripts": [ "background.js" ]
+		"service_worker": "background.js"
 	},
 	"content_scripts": [
 		{
@@ -41,5 +42,10 @@
 		}
 	],
 	"options_page": "options/index.html",
-	"web_accessible_resources": [ "inject.js" ]
+	"web_accessible_resources": [
+		{
+			"resources": [ "inject.js" ],
+			"matches": [ "*://seiga.nicovideo.jp/*" ]
+		}
+	]
 }
