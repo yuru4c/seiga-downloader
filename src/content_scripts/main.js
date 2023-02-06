@@ -1,4 +1,4 @@
-(function ($, _) {
+(function (window, $, _) {
 'use strict';
 
 var RE = /^\/seiga\/(im\d+)|^\/watch\/(mg\d+)/;
@@ -65,12 +65,17 @@ function loaded(id) {
 	}
 }
 
-_.runtime.onMessage.addListener(function (message) {
-	switch (message.type) {
+_.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+	switch (request.type) {
 		case 'loaded':
-		loaded(message.id);
+		loaded(request.id);
+		break;
+		
+		case 'alert':
+		window.alert(request.message);
+		sendResponse();
 		break;
 	}
 });
 
-})(document, chrome);
+})(window, document, chrome);

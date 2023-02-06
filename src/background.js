@@ -1,13 +1,12 @@
-(function (global, window, _) {
+(function (global, _) {
 'use strict';
 
 var Object = global.Object;
 var Promise = global.Promise;
 var Blob = global.Blob;
-var URL = global.URL;
-var XHR = global.XMLHttpRequest;
+var FileReader = global.FileReader;
+var fetch = global.fetch;
 
-var storage = global.localStorage;
 var local = _.storage.local;
 
 var KEYS = {
@@ -23,57 +22,95 @@ var EXT = /^image\/(\w+)/;
 var SRC = /data-src="(.*?)"/;
 var EOL = /\n|\r\n/g;
 
-function reset(flag) {
-	if (flag || storage.getItem(KEYS.FILENAME) == null) {
-		storage.setItem(KEYS.FILENAME,
-			'seiga/?member-id? ?member-name?/' +
-			'?illust-id? ?title?');
+var options = (function () {
+	
+	var DEF = {};
+	DEF[KEYS.FILENAME] = (
+		'seiga/?member-id? ?member-name?/' +
+		'?illust-id? ?title?'
+	);
+	DEF[KEYS.DIRNAME] = (
+		'seiga/?member-id? ?member-name?/' +
+		'?manga-id? ?manga-title?/?illust-id? ?title?'
+	);
+	DEF[KEYS.CAPTION_DL] = true;
+	DEF[KEYS.CAPTION_TXT] = (
+		'?title?\n?manga-title?\n?member-name?\n?tags?' +
+		'\n\n?caption-html?'
+	);
+	
+	function Options() {
+		this.current = null;
 	}
-	if (flag || storage.getItem(KEYS.DIRNAME) == null) {
-		storage.setItem(KEYS.DIRNAME,
-			'seiga/?member-id? ?member-name?/' +
-			'?manga-id? ?manga-title?/?illust-id? ?title?');
-	}
-	if (flag || storage.getItem(KEYS.CAPTION_DL) == null) {
-		storage.setItem(KEYS.CAPTION_DL, '1');
-	}
-	if (flag || storage.getItem(KEYS.CAPTION_TXT) == null) {
-		storage.setItem(KEYS.CAPTION_TXT,
-			'?title?\n?manga-title?\n?member-name?\n?tags?' +
-			'\n\n?caption-html?');
-	}
-}
+	var prototype = Options.prototype;
+	
+	prototype.DEF = DEF;
+	
+	prototype._get = function () {
+		var self = this;
+		return new Promise(function (resolve, reject) {
+			local.get({'options': DEF}, function (items) {
+				var error = _.runtime.lastError;
+				if (error != null) {
+					reject(error);
+					return;
+				}
+				self.current = items.options;
+				resolve(self.current);
+			});
+		});
+	};
+	
+	prototype.get = function () {
+		if (this.current != null) {
+			return Promise.resolve(this.current);
+		}
+		return this._get();
+	};
+	
+	prototype.set = function (options) {
+		var self = this;
+		return new Promise(function (resolve, reject) {
+			local.set({'options': options}, function () {
+				var error = _.runtime.lastError;
+				if (error != null) {
+					reject(error);
+					return;
+				}
+				resolve(self._get());
+			});
+		});
+	};
+	
+	return new Options();
+})();
 
 var history = (function () {
-	
-	var KEY = 'history.';
-	var LENGTH = KEY + 'length';
-	var DIFF = 'diff';
 	
 	var SPACE = ' ';
 	
 	function History() {
 		this._dict = null;
-		var item = storage.getItem(DIFF);
-		this._diff = item ? item.split(SPACE) : [];
+		this._diff = [];
+		this._diffLoaded = false;
 		
 		this._error = null;
 		this._queue = null;
 	}
 	var prototype = History.prototype;
 	
-	prototype.save = function () {
-		storage.setItem(DIFF, this._diff.join(SPACE));
-	};
-	
 	prototype._load = function () {
 		var self = this;
-		local.get(["history"], function (items) {
+		var items = ['history'];
+		if (!this._diffLoaded) {
+			items[items.length] = 'diff';
+		}
+		local.get(items, function (items) {
 			var error = _.runtime.lastError;
 			self._init(items, error);
 			
 			if (error != null) {
-				window.console.warn('_load', error.message);
+				global.console.warn('_load', error.message);
 			}
 		});
 	};
@@ -81,12 +118,15 @@ var history = (function () {
 	prototype._save = function (dict) {
 		var d = dict != null ? dict : this._dict;
 		return new Promise(function (resolve, reject) {
-			local.set({"history": Object.keys(d)}, function () {
+			local.set({
+				'history': Object.keys(d),
+				'diff': null
+			}, function () {
 				var error = _.runtime.lastError;
 				if (error != null) {
 					reject(error);
 					
-					window.console.warn('_save', error.message);
+					global.console.warn('_save', error.message);
 				} else {
 					resolve();
 				}
@@ -114,32 +154,19 @@ var history = (function () {
 		}
 	};
 	
-	prototype._loadStorage = function () {
-		var length = ~~storage.getItem(LENGTH);
-		for (var i = 0; i < length; i++) {
-			var value = storage.getItem(KEY + i);
-			if (value) {
-				this._putAll(value.split(SPACE));
-			}
-		}
-		this._update(true).then(function () {
-			storage.removeItem(LENGTH);
-			for (var i = 0; i < length; i++) {
-				storage.removeItem(KEY + i);
-			}
-		});
-	};
-	
 	prototype._init = function (items, error) {
 		this._dict = Object.create(null);
 		this._error = error;
 		if (error != null) {
 			this._update(false);
 		} else {
-			var history = items["history"];
-			if (history == null) {
-				this._loadStorage();
-			} else {
+			var diff = items['diff'];
+			if (diff != null) {
+				this._diff = this._diff.concat(diff);
+			}
+			this._diffLoaded = true;
+			var history = items['history'];
+			if (history != null) {
 				this._putAll(history);
 				this._update();
 			}
@@ -177,6 +204,21 @@ var history = (function () {
 			this._dict[id] = true;
 		}
 		this._diff.push(id);
+		
+		if (this._diffLoaded) {
+			local.set({'diff': this._diff});
+		} else {
+			var copy = this._diff.slice();
+			var self = this;
+			local.get(['diff'], function (items) {
+				var diff = items['diff'];
+				if (diff != null) {
+					self._diff = diff.concat(copy);
+				}
+				self._diffLoaded = true;
+				local.set({'diff': self._diff});
+			});
+		}
 	};
 	
 	prototype.test = function (id, sendResponse) {
@@ -204,6 +246,7 @@ var history = (function () {
 		this._save(dict).then(function () {
 			self._dict = dict;
 			self._diff = [];
+			self._diffLoaded = true;
 			sendResponse();
 		}, function (reason) {
 			sendResponse(reason);
@@ -249,26 +292,22 @@ var history = (function () {
 
 
 function replace(textKey, safe, sender) {
-	return new Promise(function (resolve) {
-		_.tabs.sendMessage(sender.tab.id, {
-			type: 'replace',
-			text: storage.getItem(textKey),
-			safe: safe
-		}, resolve);
+	return options.get().then(function (options) {
+		return new Promise(function (resolve) {
+			_.tabs.sendMessage(sender.tab.id, {
+				type: 'replace',
+				text: options[textKey],
+				safe: safe
+			}, resolve);
+		});
 	});
 }
 
-function setErrorHandler(xhr, reject) {
-	xhr.ontimeout = xhr.onerror = xhr.onabort = reject;
-}
-
 function getExt(url) {
-	return new Promise(function (resolve, reject) {
-		var xhr = new XHR();
-		xhr.open('HEAD', url);
-		xhr.onload = function () {
+	return fetch(url, {method: 'HEAD'}).then(function (response) {
+		return new Promise(function (resolve, reject) {
 			try {
-				var mime = this.getResponseHeader('Content-Type');
+				var mime = response.headers.get('Content-Type')
 				switch (mime) {
 					case 'image/jpeg':
 					resolve('.jpg');
@@ -286,26 +325,22 @@ function getExt(url) {
 				reject(e);
 			}
 			reject();
-		};
-		setErrorHandler(xhr, reject);
-		xhr.send();
+		});
 	});
 }
 
 function getURL(url) {
-	return new Promise(function (resolve, reject) {
-		var xhr = new XHR();
-		xhr.open('GET', url);
-		xhr.onload = function () {
+	return fetch(url).then(function (response) {
+		return response.text();
+	}).then(function (text) {
+		return new Promise(function (resolve, reject) {
 			try {
-				var src = SRC.exec(this.responseText)[1];
+				var src = SRC.exec(text)[1];
 				resolve(src.startsWith('/priv/') ? LOHAS + src : src);
 			} catch (e) {
 				reject(e);
 			}
-		};
-		setErrorHandler(xhr, reject);
-		xhr.send();
+		});
 	});
 }
 
@@ -327,18 +362,31 @@ function downloadAsync(url, filename) {
 
 
 function downloadText(p_filename, sender) {
-	if (!+storage.getItem(KEYS.CAPTION_DL)) {
-		return Promise.resolve();
-	}
-	var p_text = replace(KEYS.CAPTION_TXT, false, sender);
-	
-	return Promise.all([p_filename, p_text]).then(function (values) {
-		var filename = values[0], text = values[1];
+	return options.get().then(function (options) {
+		if (!options[KEYS.CAPTION_DL]) {
+			return;
+		}
+		var p_text = replace(KEYS.CAPTION_TXT, false, sender);
 		
-		var url = URL.createObjectURL(new Blob([
-			'\uFEFF', text.replace(EOL, '\r\n')
-		]));
-		return downloadAsync(url, filename + '.txt');
+		return Promise.all([p_filename, p_text]).then(function (values) {
+			var filename = values[0], text = values[1];
+			
+			var blob = new Blob([
+				'\uFEFF', text.replace(EOL, '\r\n')
+			]);
+			return new Promise(function (resolve, reject) {
+				var reader = new FileReader();
+				reader.onload = function () {
+					resolve(this.result);
+				};
+				reader.onerror = function (error) {
+					reject(error);
+				};
+				reader.readAsDataURL(blob);
+			}).then(function (url) {
+				return downloadAsync(url, filename + '.txt');
+			});
+		});
 	});
 }
 
@@ -375,7 +423,7 @@ function download(url, id, version, sender, sendResponse) {
 		done(sender);
 		sendResponse(reason || true);
 		
-		window.console.warn('download', [url, id, version], reason && reason.message);
+		global.console.warn('download', [url, id, version], reason && reason.message);
 	});
 }
 
@@ -407,10 +455,23 @@ function downloadMg(urlList, id, version, sender, sendResponse) {
 				downloads[i] = downloadMgMain(p_dirname, filename, url);
 			}
 		}
+		var all = Promise.all(downloads);
 		if (fails.length) {
-			window.alert(fails.join(', ') + ' ページ目は欠落します。');
+			return new Promise(function (resolve) {
+				var tabId = sender.tab.id;
+				if (tabId in createdToOpener) {
+					tabId = createdToOpener[tabId];
+				}
+				_.tabs.sendMessage(tabId, {
+					type: 'alert',
+					message: fails.join(', ') + ' ページ目は欠落します。'
+				}, resolve);
+			}).then(function () {
+				return all;
+			});
+		} else {
+			return all;
 		}
-		return Promise.all(downloads);
 	}).then(function () {
 		history.put(id);
 		done(sender, id);
@@ -423,7 +484,7 @@ function downloadMg(urlList, id, version, sender, sendResponse) {
 			done(sender);
 			sendResponse(response);
 			
-			window.console.warn('download-mg', [urlList, id, version], reason && reason.message);
+			global.console.warn('download-mg', [urlList, id, version], reason && reason.message);
 		}
 	});
 }
@@ -487,11 +548,6 @@ function onclick_download(linkUrl, tab) {
 	});
 }
 
-
-window.onunload = function () {
-	history.save();
-};
-
 _.contextMenus.onClicked.addListener(function (info, tab) {
 	switch (info.menuItemId) {
 		case 'download':
@@ -501,8 +557,9 @@ _.contextMenus.onClicked.addListener(function (info, tab) {
 });
 
 _.runtime.onInstalled.addListener(function () {
-	reset(false);
-	contextmenu(+storage.getItem('contextmenu'));
+	local.get(['contextmenu'], function (items) {
+		contextmenu(items['contextmenu']);
+	});
 });
 
 _.runtime.onMessage.addListener(function (request, sender, sendResponse) {
@@ -527,10 +584,21 @@ _.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 		);
 		return true;
 		
-		case 'reset':
-		reset(true);
-		sendResponse();
-		break;
+		case 'options-get':
+		options.get().then(function (options) {
+			sendResponse(options);
+		});
+		return true;
+		
+		case 'options-set':
+		options.set(request.options).then(function () {
+			sendResponse();
+		});
+		return true;
+		
+		case 'options-default':
+		sendResponse(options.DEF);
+		return;
 		
 		case 'load':
 		return history.getValue(sendResponse);
@@ -544,4 +612,4 @@ _.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 	}
 });
 
-})(this, window, chrome);
+})(this, chrome);

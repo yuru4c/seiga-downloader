@@ -1,7 +1,7 @@
 (function (global, window, $, _) {
 'use strict';
 
-var storage = global.localStorage;
+var local = _.storage.local;
 
 var MENU = 'contextmenu';
 
@@ -16,23 +16,22 @@ $.addEventListener('DOMContentLoaded', function () {
 	var reset = $.getElementById('reset');
 	var save  = $.getElementById('save');
 	
-	function load() {
+	function load(options) {
 		for (var id in inputs) {
 			var input = inputs[id];
 			switch (input.type) {
 				case 'checkbox':
-				input.checked = +storage.getItem(id);
+				input.checked = options[id];
 				break;
 				
 				default:
-				input.value = storage.getItem(id);
+				input.value = options[id];
 				break;
 			}
 		}
-		save.disabled = true;
 	}
 	function enable() {
-		save.disabled = reset.disabled = false;
+		save.disabled = false;
 	}
 	
 	for (var id in inputs) {
@@ -48,54 +47,65 @@ $.addEventListener('DOMContentLoaded', function () {
 		}
 		inputs[id] = input;
 	}
-	load();
+	_.runtime.sendMessage({type: 'options-get'}, function (options) {
+		load(options);
+		save.disabled = true;
+	});
 	
 	reset.onclick = function () {
-		if (window.confirm('設定をリセットしますか？')) {
-			this.disabled = true;
-			_.runtime.sendMessage({type: 'reset'}, load);
-		}
+		this.disabled = true;
+		_.runtime.sendMessage({type: 'options-default'}, function (options) {
+			load(options);
+			reset.disabled = false;
+			save.disabled = false;
+		});
 	};
 	
 	save.onclick = function () {
+		var options = {};
 		for (var id in inputs) {
 			var input = inputs[id];
 			switch (input.type) {
 				case 'checkbox':
-				storage.setItem(id, +input.checked);
+				options[id] = input.checked;
 				break;
 				
 				default:
-				storage.setItem(id, input.value);
+				options[id] = input.value;
 				break;
 			}
 		}
-		this.disabled = true;
-	};
-	
-	
-	var enabled = +storage.getItem(MENU);
-	var check  = $.getElementById('check');
-	var button = $.getElementById('contextmenu');
-	
-	function set() {
-		check.checked = enabled;
-		button.value = enabled ? '無効化' : '有効化';
-		button.disabled = false;
-	}
-	set();
-	
-	button.onclick = function () {
-		this.disabled = true;
-		var not = !enabled;
-		_.runtime.sendMessage({
-			type: 'contextmenu', create: not
-		}, function () {
-			enabled = +not;
-			storage.setItem(MENU, enabled);
-			set();
+		_.runtime.sendMessage({type: 'options-set', options: options}, function () {
+			save.disabled = true;
 		});
 	};
+	
+	
+	var check  = $.getElementById('check');
+	var button = $.getElementById('contextmenu');
+	local.get([MENU], function (items) {
+		var enabled = !!items[MENU];
+		
+		function set() {
+			check.checked = enabled;
+			button.value = enabled ? '無効化' : '有効化';
+			button.disabled = false;
+		}
+		set();
+		
+		button.onclick = function () {
+			this.disabled = true;
+			var not = !enabled;
+			_.runtime.sendMessage({
+				type: 'contextmenu', create: not
+			}, function () {
+				enabled = +not;
+				var items = {};
+				items[MENU] = enabled;
+				local.set(items, set);
+			});
+		};
+	});
 	
 	
 	var historyText = $.getElementById('history_text');
