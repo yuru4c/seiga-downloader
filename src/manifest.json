@@ -1,6 +1,6 @@
 {
 	"manifest_version": 3,
-	"version": "3.8.11",
+	"version": "3.8.12",
 	"name": "Seiga Downloader",
 	"description": "ニコニコ静画の作品ページに画像ダウンロード用のリンクを追加",
 	"icons": {
