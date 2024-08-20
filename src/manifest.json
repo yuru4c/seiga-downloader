@@ -17,6 +17,7 @@
 	"host_permissions": [
 		"*://lohas.nicoseiga.jp/",
 		"*://seiga.nicovideo.jp/",
+        "*://manga.nicovideo.jp/",
 		"https://dcdn.cdn.nimg.jp/",
 		"https://deliver.cdn.nicomanga.jp/"
 	],
@@ -26,18 +27,18 @@
 	"content_scripts": [
 		{
 			"css": [ "content_scripts/main.css" ],
-			"matches": [ "*://seiga.nicovideo.jp/*" ],
+			"matches": [ "*://seiga.nicovideo.jp/*", "*://manga.nicovideo.jp/*"  ],
 			"run_at": "document_start"
 		}, {
 			"js":  [ "content_scripts/main.js" ],
-			"matches": [ "*://seiga.nicovideo.jp/*" ]
+			"matches": [ "*://seiga.nicovideo.jp/*", "*://manga.nicovideo.jp/*" ]
 		}, {
 			"js":  [ "content_scripts/seiga.js" ],
 			"matches": [ "*://seiga.nicovideo.jp/seiga/im*" ],
 			"run_at": "document_start"
 		}, {
 			"js":  [ "content_scripts/watch.js" ],
-			"matches": [ "*://seiga.nicovideo.jp/watch/mg*" ],
+			"matches": [ "*://manga.nicovideo.jp/watch/mg*" ],
 			"run_at": "document_start"
 		}
 	],
@@ -45,7 +46,7 @@
 	"web_accessible_resources": [
 		{
 			"resources": [ "inject.js" ],
-			"matches": [ "*://seiga.nicovideo.jp/*" ]
+			"matches": [ "*://seiga.nicovideo.jp/*", "*://manga.nicovideo.jp/*" ]
 		}
 	]
 }
